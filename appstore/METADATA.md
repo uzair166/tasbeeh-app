@@ -139,10 +139,45 @@ This app observes volume changes via KVO on AVAudioSession.outputVolume to detec
 
 Required for UserDefaults usage. Declare reason `CA92.1` (accessing info from same app).
 
-## Still Needed
+## Screenshots
 
-- [ ] Screenshots (6.7" and 6.5" displays minimum)
-- [ ] App Preview video (optional but recommended)
-- [ ] Privacy manifest file (`PrivacyInfo.xcprivacy`)
-- [ ] Test on physical device before submission
-- [ ] Set up App Store Connect listing
+Selected screenshots for App Store (1290×2796, iPhone 6.7"):
+
+| Order | File | Headline | Purpose |
+|---|---|---|---|
+| 1 | `marketing/01-hero-dark.png` | Count Without Looking | Hero — USP front and center |
+| 2 | `marketing/11-fullscreen-hero.png` | Count Without Looking | Immersive full-bleed screenshot |
+| 3 | `marketing/10-count-and-track.png` | Count & Track | Dual phone — counter + stats |
+| 4 | `marketing/03-dhikr-library.png` | 12 Common Dhikr Phrases | Library picker (content depth) |
+| 5 | `marketing/09-dual-modes.png` | Beautiful in Every Mode | Dark + Light side by side |
+| 6 | `marketing/08-features-overview.png` | Everything You Need | Feature list catch-all |
+
+Additional available in `appstore/marketing/`: 02-stats, 04-volume-feature, 05-light-mode, 06-light-stats, 07-pocket-dhikr.
+
+Raw simulator screenshots in `appstore/screenshots/`: counter dark/light, stats dark/light, dhikr picker dark.
+
+**Note:** These are 1290×2796 (6.7"). For 6.9" (1320×2868) displays, scale up proportionally. For 6.5" (1284×2778), scale down. App Store Connect accepts the 6.7" size and auto-generates other sizes.
+
+## Submission Checklist
+
+- [x] App Name: Tasbeeh: Volume Button Counter
+- [x] Subtitle: Dhikr Counter & Zikr Tracker
+- [x] Keywords (97 chars)
+- [x] Description (~2,400 chars)
+- [x] Promotional Text (148 chars)
+- [x] What's New text
+- [x] App Review Notes (volume button explanation)
+- [x] Privacy Labels: "Data Not Collected"
+- [x] Privacy Policy URL: https://uzair166.github.io/tasbeeh-app/privacy.html
+- [x] Support URL: https://uzair166.github.io/tasbeeh-app/privacy.html
+- [x] Privacy manifest file (`Tasbeeh/PrivacyInfo.xcprivacy`)
+- [x] App icon (1024×1024 in Assets.xcassets)
+- [x] Screenshots — 6 selected (1290×2796)
+- [x] Age Rating: 4+
+- [x] Categories: Lifestyle / Utilities
+- [x] Copyright: 2026 Uzair Ishaq
+- [ ] Create App Store Connect listing and upload build
+- [ ] Apple Developer portal: create App Group (`group.com.alliance.tasbeeh`)
+- [ ] Apple Developer portal: create CloudKit container (`iCloud.com.alliance.tasbeeh`)
+- [ ] Archive build with Release configuration and upload via Xcode Organizer or `xcrun altool`
+- [ ] Test on physical device one final time before submission
