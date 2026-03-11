@@ -33,7 +33,12 @@ final class AppState: ObservableObject {
     }
 
     @Published var iCloudSyncEnabled: Bool {
-        didSet { save(Key.iCloudSyncEnabled, iCloudSyncEnabled) }
+        didSet {
+            save(Key.iCloudSyncEnabled, iCloudSyncEnabled)
+            if iCloudSyncEnabled {
+                pushAllToiCloud()
+            }
+        }
     }
 
     @Published var appearanceMode: AppearanceMode {
@@ -208,7 +213,8 @@ final class AppState: ObservableObject {
         let today = Self.todayString()
         if lastActiveDate == today { return }
 
-        let yesterday = Self.dateString(for: Calendar.current.date(byAdding: .day, value: -1, to: Date())!)
+        guard let yesterdayDate = Calendar.current.date(byAdding: .day, value: -1, to: Date()) else { return }
+        let yesterday = Self.dateString(for: yesterdayDate)
         if lastActiveDate == yesterday {
             currentStreak += 1
         } else if lastActiveDate != today {
@@ -298,10 +304,34 @@ final class AppState: ObservableObject {
 
     // MARK: - Persistence Helpers
 
-    private func save(_ key: String, _ value: Any) {
+    private func save(_ key: String, _ value: String) {
         defaults.set(value, forKey: key)
         guard iCloudSyncEnabled else { return }
         ubiquitous.set(value, forKey: key)
+    }
+
+    private func save(_ key: String, _ value: Int) {
+        defaults.set(value, forKey: key)
+        guard iCloudSyncEnabled else { return }
+        ubiquitous.set(value, forKey: key)
+    }
+
+    private func save(_ key: String, _ value: Bool) {
+        defaults.set(value, forKey: key)
+        guard iCloudSyncEnabled else { return }
+        ubiquitous.set(value, forKey: key)
+    }
+
+    private func pushAllToiCloud() {
+        ubiquitous.set(lifetimeCount, forKey: Key.lifetimeCount)
+        ubiquitous.set(todayCount, forKey: Key.todayCount)
+        ubiquitous.set(currentStreak, forKey: Key.currentStreak)
+        ubiquitous.set(bestStreak, forKey: Key.bestStreak)
+        ubiquitous.set(bestDayCount, forKey: Key.bestDayCount)
+        ubiquitous.set(bestDayDate, forKey: Key.bestDayDate)
+        if let data = try? JSONEncoder().encode(history) {
+            ubiquitous.set(data, forKey: Key.history)
+        }
     }
 
     private func savePresets() {
@@ -351,7 +381,8 @@ final class AppState: ObservableObject {
     var thisMonthCount: Int {
         let cal = Calendar.current
         let components = cal.dateComponents([.year, .month], from: Date())
-        let prefix = String(format: "%04d-%02d", components.year!, components.month!)
+        guard let year = components.year, let month = components.month else { return 0 }
+        let prefix = String(format: "%04d-%02d", year, month)
         return history.filter { $0.key.hasPrefix(prefix) }.values.reduce(0, +)
     }
 

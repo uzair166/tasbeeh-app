@@ -73,7 +73,10 @@ struct TargetPickerView: View {
                                 .background(t.accentGradient)
                                 .cornerRadius(10)
                         }
-                        .disabled(Int(customValue) == nil || Int(customValue)! <= 0 || Int(customValue)! > 10000)
+                        .disabled({
+                            guard let v = Int(customValue) else { return true }
+                            return v <= 0 || v > 10000
+                        }())
                     }
                 }
                 .padding(.horizontal, 20)

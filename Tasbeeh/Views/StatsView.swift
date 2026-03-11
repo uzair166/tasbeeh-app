@@ -338,8 +338,10 @@ struct StatsView: View {
     }
 
     private var daysInMonth: [DayItem] {
-        let range = calendar.range(of: .day, in: .month, for: displayMonth)!
-        let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: displayMonth))!
+        guard let range = calendar.range(of: .day, in: .month, for: displayMonth),
+              let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: displayMonth)) else {
+            return []
+        }
         let firstWeekday = calendar.component(.weekday, from: firstDay)
         let offset = firstWeekday - calendar.firstWeekday
         let paddedOffset = (offset + 7) % 7
@@ -351,7 +353,7 @@ struct StatsView: View {
 
         let today = AppState.todayString()
         for day in range {
-            let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay)!
+            guard let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay) else { continue }
             let dateString = AppState.dateString(for: date)
             let count = appState.history[dateString] ?? (dateString == today ? appState.todayCount : 0)
             let isToday = dateString == today
@@ -376,13 +378,16 @@ struct StatsView: View {
                 // Month navigation
                 HStack {
                     Button {
-                        displayMonth = calendar.date(byAdding: .month, value: -1, to: displayMonth)!
+                        if let prev = calendar.date(byAdding: .month, value: -1, to: displayMonth) {
+                            displayMonth = prev
+                        }
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(t.accentStart)
                             .frame(width: 28, height: 28)
                     }
+                    .accessibilityLabel("Previous month")
 
                     Spacer()
                     Text(monthTitle)
@@ -391,8 +396,7 @@ struct StatsView: View {
                     Spacer()
 
                     Button {
-                        let next = calendar.date(byAdding: .month, value: 1, to: displayMonth)!
-                        if next <= Date() {
+                        if let next = calendar.date(byAdding: .month, value: 1, to: displayMonth), next <= Date() {
                             displayMonth = next
                         }
                     } label: {
@@ -401,6 +405,7 @@ struct StatsView: View {
                             .foregroundColor(t.accentStart)
                             .frame(width: 28, height: 28)
                     }
+                    .accessibilityLabel("Next month")
                 }
 
                 // Weekday headers

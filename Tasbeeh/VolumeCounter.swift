@@ -1,6 +1,9 @@
 import AVFoundation
 import MediaPlayer
+import os
 import UIKit
+
+private let logger = Logger(subsystem: "com.alliance.tasbeeh", category: "VolumeCounter")
 
 final class VolumeCounter: ObservableObject {
     @Published var count: Int = 0
@@ -14,6 +17,7 @@ final class VolumeCounter: ObservableObject {
     private let targetVolume: Float = 0.5
     private let edgeThreshold: Float = 0.15
     private weak var volumeSlider: UISlider?
+    private weak var volumeViewContainer: MPVolumeView?
 
     init(appState: AppState = .shared) {
         self.appState = appState
@@ -26,13 +30,15 @@ final class VolumeCounter: ObservableObject {
         if let observer = interruptionObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        volumeViewContainer?.removeFromSuperview()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
     func setupVolumeView(in window: UIWindow?) {
-        guard let window = window else { return }
+        guard let window = window, volumeViewContainer == nil else { return }
         let mpView = MPVolumeView(frame: CGRect(x: -300, y: -300, width: 100, height: 100))
         window.addSubview(mpView)
+        volumeViewContainer = mpView
         volumeSlider = mpView.subviews.first(where: { $0 is UISlider }) as? UISlider
         setSystemVolume(targetVolume)
     }
@@ -45,7 +51,7 @@ final class VolumeCounter: ObservableObject {
             try session.setCategory(.playback, options: [.mixWithOthers])
             try session.setActive(true)
         } catch {
-            print("[Tasbeeh] Audio session setup failed: \(error)")
+            logger.error("Audio session setup failed: \(error.localizedDescription)")
         }
 
         UIApplication.shared.isIdleTimerDisabled = true
@@ -59,7 +65,10 @@ final class VolumeCounter: ObservableObject {
         let player = AVAudioPlayerNode()
         engine.attach(player)
 
-        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1) else {
+            logger.error("Failed to create audio format")
+            return
+        }
         engine.connect(player, to: engine.mainMixerNode, format: format)
         engine.mainMixerNode.outputVolume = 0.0001
 
@@ -74,7 +83,7 @@ final class VolumeCounter: ObservableObject {
             audioEngine = engine
             playerNode = player
         } catch {
-            print("[Tasbeeh] Audio engine failed: \(error)")
+            logger.error("Audio engine failed: \(error.localizedDescription)")
         }
     }
 
@@ -107,7 +116,7 @@ final class VolumeCounter: ObservableObject {
         do {
             try session.setActive(true)
         } catch {
-            print("[Tasbeeh] Failed to reactivate audio session: \(error)")
+            logger.error("Failed to reactivate audio session: \(error.localizedDescription)")
         }
         startSilentAudioEngine()
     }

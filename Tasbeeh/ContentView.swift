@@ -81,6 +81,7 @@ struct ContentView: View {
                             .background(t.surface)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Benefits of Dhikr")
 
                     Spacer()
 
@@ -92,6 +93,7 @@ struct ContentView: View {
                             .background(t.surface)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Stats and History")
 
                     Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
@@ -101,6 +103,7 @@ struct ContentView: View {
                             .background(t.surface)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Settings")
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
