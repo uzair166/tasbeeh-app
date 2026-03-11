@@ -7,7 +7,18 @@ struct TasbeehApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(appState: appState)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(preferredColorScheme)
+        }
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        switch appState.appearanceMode {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
         }
     }
 }

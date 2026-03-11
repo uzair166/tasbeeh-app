@@ -2,8 +2,10 @@ import SwiftUI
 
 struct HistoryView: View {
     @ObservedObject var appState: AppState
+    @Environment(\.colorScheme) private var colorScheme
 
-    private let gold = Color(red: 0.82, green: 0.70, blue: 0.38)
+    private var theme: TasbeehTheme { TasbeehTheme(for: colorScheme) }
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
     private let calendar = Calendar.current
     private let weekdaySymbols = Calendar.current.veryShortWeekdaySymbols
@@ -24,14 +26,11 @@ struct HistoryView: View {
         let paddedOffset = (offset + 7) % 7
 
         var items: [DayItem] = []
-
-        // Empty cells before first day
         for _ in 0..<paddedOffset {
             items.append(DayItem(day: 0, count: 0, isToday: false))
         }
 
         let today = AppState.todayString()
-
         for day in range {
             let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay)!
             let dateString = AppState.dateString(for: date)
@@ -39,7 +38,6 @@ struct HistoryView: View {
             let isToday = dateString == today
             items.append(DayItem(day: day, count: count, isToday: isToday))
         }
-
         return items
     }
 
@@ -48,101 +46,161 @@ struct HistoryView: View {
     }
 
     var body: some View {
+        let t = theme
+
         ScrollView {
-            VStack(spacing: 24) {
-                // Stats header
-                HStack(spacing: 32) {
-                    statBlock(value: "\(appState.currentStreak)", label: "Day Streak")
-                    statBlock(value: "\(appState.lifetimeCount.formatted())", label: "Lifetime")
-                    statBlock(value: "\(appState.todayCount)", label: "Today")
+            VStack(spacing: 0) {
+                // Gradient header
+                VStack(spacing: 6) {
+                    Text("\(appState.currentStreak)")
+                        .font(.system(size: 60, weight: .semibold, design: .rounded))
+                        .foregroundColor(t.primaryText)
+                    Text("Day Streak")
+                        .font(.system(size: 15))
+                        .foregroundColor(t.secondaryText)
                 }
-                .padding(.top, 16)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+                .background(t.headerGradient)
 
-                // Month navigation
-                HStack {
-                    Button {
-                        displayMonth = calendar.date(byAdding: .month, value: -1, to: displayMonth)!
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .foregroundColor(gold)
+                VStack(spacing: 20) {
+                    // Stats row
+                    HStack(spacing: 12) {
+                        statCard(value: "\(appState.todayCount)", label: "Today", theme: t)
+                        statCard(value: "\(appState.lifetimeCount.formatted())", label: "Lifetime", theme: t)
                     }
+                    .padding(.horizontal, 20)
 
-                    Spacer()
-                    Text(monthTitle)
-                        .font(.headline)
-                    Spacer()
-
-                    Button {
-                        let next = calendar.date(byAdding: .month, value: 1, to: displayMonth)!
-                        if next <= Date() {
-                            displayMonth = next
+                    // Month navigation
+                    HStack {
+                        Button {
+                            displayMonth = calendar.date(byAdding: .month, value: -1, to: displayMonth)!
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .foregroundColor(t.accentStart)
                         }
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(gold)
-                    }
-                }
-                .padding(.horizontal)
 
-                // Weekday headers
-                LazyVGrid(columns: columns, spacing: 4) {
-                    ForEach(weekdaySymbols, id: \.self) { symbol in
-                        Text(symbol)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .frame(height: 20)
-                    }
-                }
-                .padding(.horizontal)
+                        Spacer()
+                        Text(monthTitle)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(t.primaryText)
+                        Spacer()
 
-                // Calendar grid
-                LazyVGrid(columns: columns, spacing: 4) {
-                    ForEach(Array(daysInMonth.enumerated()), id: \.offset) { _, item in
-                        if item.day == 0 {
-                            Color.clear.frame(height: 40)
-                        } else {
-                            dayCell(item)
+                        Button {
+                            let next = calendar.date(byAdding: .month, value: 1, to: displayMonth)!
+                            if next <= Date() {
+                                displayMonth = next
+                            }
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(t.accentStart)
                         }
                     }
+                    .padding(.horizontal, 20)
+
+                    // Weekday headers
+                    LazyVGrid(columns: columns, spacing: 4) {
+                        ForEach(weekdaySymbols, id: \.self) { symbol in
+                            Text(symbol)
+                                .font(.caption2)
+                                .foregroundColor(t.tertiaryText)
+                                .frame(height: 20)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+
+                    // Calendar grid
+                    LazyVGrid(columns: columns, spacing: 4) {
+                        ForEach(Array(daysInMonth.enumerated()), id: \.offset) { _, item in
+                            if item.day == 0 {
+                                Color.clear.frame(height: 40)
+                            } else {
+                                dayCell(item, theme: t)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+
+                    // Legend
+                    HStack(spacing: 6) {
+                        Text("Less")
+                            .font(.system(size: 10))
+                            .foregroundColor(t.tertiaryText)
+                        ForEach([t.heatmap1, t.heatmap2, t.heatmap3, t.heatmap4], id: \.description) { color in
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(color)
+                                .frame(width: 14, height: 14)
+                        }
+                        Text("More")
+                            .font(.system(size: 10))
+                            .foregroundColor(t.tertiaryText)
+                    }
+                    .padding(.top, 4)
                 }
-                .padding(.horizontal)
+                .padding(.top, 20)
+                .padding(.bottom, 32)
             }
-            .padding(.bottom, 24)
         }
+        .background(t.background.ignoresSafeArea())
         .navigationTitle("History")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func dayCell(_ item: DayItem) -> some View {
-        let intensity = item.count > 0 ? max(0.2, min(1.0, Double(item.count) / Double(maxCount))) : 0.0
+    private func dayCell(_ item: DayItem, theme t: TasbeehTheme) -> some View {
+        let tier: Int = {
+            guard item.count > 0 else { return 0 }
+            let ratio = Double(item.count) / Double(maxCount)
+            if ratio <= 0.25 { return 1 }
+            if ratio <= 0.50 { return 2 }
+            if ratio <= 0.75 { return 3 }
+            return 4
+        }()
+
+        let bgColor: Color = {
+            switch tier {
+            case 1: return t.heatmap1
+            case 2: return t.heatmap2
+            case 3: return t.heatmap3
+            case 4: return t.heatmap4
+            default: return Color.clear
+            }
+        }()
 
         return VStack(spacing: 2) {
             Text("\(item.day)")
                 .font(.system(size: 13))
-                .foregroundColor(item.isToday ? gold : .primary)
+                .foregroundColor(item.isToday ? t.accentStart : t.primaryText)
                 .fontWeight(item.isToday ? .bold : .regular)
         }
         .frame(height: 40)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(item.count > 0 ? gold.opacity(intensity * 0.4) : Color.clear)
+                .fill(bgColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(item.isToday ? gold.opacity(0.5) : Color.clear, lineWidth: 1)
+                .strokeBorder(item.isToday ? t.primaryText.opacity(0.9) : Color.clear, lineWidth: 1.5)
         )
     }
 
-    private func statBlock(value: String, label: String) -> some View {
+    private func statCard(value: String, label: String, theme t: TasbeehTheme) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 24, weight: .semibold, design: .rounded))
-                .foregroundColor(gold)
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundColor(t.primaryText)
             Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.system(size: 12))
+                .foregroundColor(t.secondaryText)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(t.surface)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(t.surfaceBorder, lineWidth: 1)
+        )
     }
 }
 

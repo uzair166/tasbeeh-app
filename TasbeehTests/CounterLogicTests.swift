@@ -52,7 +52,7 @@ final class CounterLogicTests: XCTestCase {
             id: UUID(),
             name: "Custom 50",
             arabicName: "custom",
-            phases: [DhikrPhase(arabicText: "custom", count: 50)],
+            phases: [DhikrPhase(arabicText: "custom", transliteration: "Custom", count: 50)],
             targetCount: 50,
             isBuiltIn: false
         )
@@ -68,8 +68,8 @@ final class CounterLogicTests: XCTestCase {
             name: "Two Phase",
             arabicName: "two",
             phases: [
-                DhikrPhase(arabicText: "phase1", count: 25),
-                DhikrPhase(arabicText: "phase2", count: 25),
+                DhikrPhase(arabicText: "phase1", transliteration: "Phase 1", count: 25),
+                DhikrPhase(arabicText: "phase2", transliteration: "Phase 2", count: 25),
             ],
             targetCount: 50,
             isBuiltIn: false

@@ -51,10 +51,25 @@ struct TasbeehWidget: Widget {
 
 struct TasbeehWidgetView: View {
     @Environment(\.widgetFamily) var family
+    @Environment(\.colorScheme) var colorScheme
     let entry: TasbeehEntry
 
-    private let gold = Color(red: 0.82, green: 0.70, blue: 0.38)
-    private let bg = Color(red: 0.05, green: 0.09, blue: 0.14)
+    private var accentStart: Color { Color(red: 0.753, green: 0.702, blue: 0.941) } // lilac
+    private var accentEnd: Color { Color(red: 0.576, green: 0.773, blue: 0.969) }   // blue
+
+    private var bg: Color {
+        colorScheme == .dark
+            ? Color(red: 0.047, green: 0.047, blue: 0.055)
+            : .white
+    }
+
+    private var primaryText: Color {
+        colorScheme == .dark ? .white : Color(red: 0.1, green: 0.1, blue: 0.12)
+    }
+
+    private var secondaryText: Color {
+        colorScheme == .dark ? Color.white.opacity(0.55) : Color(red: 0.4, green: 0.4, blue: 0.45)
+    }
 
     var body: some View {
         Group {
@@ -72,11 +87,11 @@ struct TasbeehWidgetView: View {
         VStack(spacing: 8) {
             Text("Today")
                 .font(.caption)
-                .foregroundColor(gold.opacity(0.7))
+                .foregroundColor(accentStart.opacity(0.8))
 
             Text("\(entry.todayCount)")
                 .font(.system(size: 48, weight: .thin, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(primaryText)
                 .monospacedDigit()
 
             if entry.currentStreak > 0 {
@@ -86,7 +101,7 @@ struct TasbeehWidgetView: View {
                     Text("\(entry.currentStreak)")
                         .font(.caption2)
                 }
-                .foregroundColor(gold.opacity(0.6))
+                .foregroundColor(accentEnd.opacity(0.7))
             }
         }
     }
@@ -96,17 +111,17 @@ struct TasbeehWidgetView: View {
             VStack(spacing: 8) {
                 Text("Today")
                     .font(.caption)
-                    .foregroundColor(gold.opacity(0.7))
+                    .foregroundColor(accentStart.opacity(0.8))
 
                 Text("\(entry.todayCount)")
                     .font(.system(size: 48, weight: .thin, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(primaryText)
                     .monospacedDigit()
             }
             .frame(maxWidth: .infinity)
 
             Divider()
-                .background(Color.white.opacity(0.1))
+                .background(secondaryText.opacity(0.2))
 
             VStack(spacing: 12) {
                 statRow(icon: "infinity", label: "Lifetime", value: "\(entry.lifetimeCount)")
@@ -121,18 +136,18 @@ struct TasbeehWidgetView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(gold.opacity(0.6))
+                .foregroundColor(accentEnd.opacity(0.7))
                 .frame(width: 16)
 
             Text(label)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(secondaryText)
 
             Spacer()
 
             Text(value)
                 .font(.caption)
-                .foregroundColor(.white)
+                .foregroundColor(primaryText)
                 .monospacedDigit()
         }
     }

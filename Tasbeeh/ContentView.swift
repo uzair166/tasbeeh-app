@@ -3,76 +3,103 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var counter = VolumeCounter()
     @ObservedObject var appState: AppState = .shared
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showSettings = false
+    @State private var showBenefits = false
     @State private var showPresets = false
+    @State private var showDhikrPicker = false
+    @State private var showTargetPicker = false
+    @State private var showStats = false
 
-    private let gold = Color(red: 0.82, green: 0.70, blue: 0.38)
+    private var theme: TasbeehTheme { TasbeehTheme(for: colorScheme) }
 
     private var activePreset: DhikrPreset {
         appState.activePreset
     }
 
-    private var currentPhaseText: String {
-        activePreset.currentPhase(for: counter.count)?.arabicText ?? activePreset.arabicName
+    private var currentPhase: DhikrPhase? {
+        activePreset.currentPhase(for: counter.count)
     }
 
-    private var segmentFraction: CGFloat {
+    private var currentPhaseArabic: String {
+        currentPhase?.arabicText ?? activePreset.arabicName
+    }
+
+    private var currentTransliteration: String {
+        currentPhase?.transliteration ?? activePreset.name
+    }
+
+    private var ringProgress: CGFloat {
         let target = activePreset.targetCount
         guard target > 0, counter.count > 0 else { return 0 }
+        return min(CGFloat(counter.count) / CGFloat(target), 1.0)
+    }
 
-        if activePreset.phases.count > 1 {
-            // Multi-phase: fill ring per current phase
-            var remaining = counter.count
-            var currentPhaseSize = activePreset.phases.first?.count ?? target
-            for phase in activePreset.phases {
-                if remaining <= phase.count {
-                    currentPhaseSize = phase.count
-                    return CGFloat(remaining) / CGFloat(currentPhaseSize)
-                }
-                remaining -= phase.count
-            }
-            return 1.0
-        } else {
-            // Single phase: fill ring toward target
-            return CGFloat(counter.count) / CGFloat(target)
+    private var phaseCount: Int {
+        activePreset.phases.count
+    }
+
+    private var currentPhaseIndex: Int {
+        guard phaseCount > 1 else { return 0 }
+        var remaining = counter.count % max(activePreset.targetCount, 1)
+        for (i, phase) in activePreset.phases.enumerated() {
+            if remaining < phase.count { return i }
+            remaining -= phase.count
         }
+        return phaseCount - 1
     }
 
-    private var milestones: [Int] {
-        activePreset.milestoneIndices()
-    }
+    // Ring sizing
+    private let ringSize: CGFloat = 260
+    private let ringStroke: CGFloat = 5
+    private let glowStroke: CGFloat = 12
 
     var body: some View {
+        let t = theme
+
         ZStack {
             // Background
-            LinearGradient(
-                colors: [
-                    Color(red: 0.05, green: 0.09, blue: 0.14),
-                    Color(red: 0.08, green: 0.14, blue: 0.20)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            t.background.ignoresSafeArea()
+
+            // Top gradient overlay
+            VStack {
+                t.headerGradient
+                    .frame(height: 440)
+                Spacer()
+            }
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Top bar
-                HStack {
-                    // Lifetime count
-                    Text("\(appState.lifetimeCount.formatted()) total")
-                        .font(.system(size: 13))
-                        .foregroundColor(.white.opacity(0.2))
+                // Top bar: info left, stats + gear right
+                HStack(spacing: 10) {
+                    Button { showBenefits = true } label: {
+                        Image(systemName: "info")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(t.secondaryText)
+                            .frame(width: 32, height: 32)
+                            .background(t.surface)
+                            .clipShape(Circle())
+                    }
 
                     Spacer()
 
-                    // Settings gear
-                    Button {
-                        showSettings = true
-                    } label: {
+                    Button { showStats = true } label: {
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(t.secondaryText)
+                            .frame(width: 32, height: 32)
+                            .background(t.surface)
+                            .clipShape(Circle())
+                    }
+
+                    Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.35))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(t.secondaryText)
+                            .frame(width: 32, height: 32)
+                            .background(t.surface)
+                            .clipShape(Circle())
                     }
                 }
                 .padding(.horizontal, 24)
@@ -80,93 +107,122 @@ struct ContentView: View {
 
                 Spacer()
 
-                // Arabic title / preset name
+                // Arabic text
                 Button {
-                    showPresets = true
+                    if activePreset.isQuickCounter {
+                        showDhikrPicker = true
+                    } else {
+                        showPresets = true
+                    }
                 } label: {
-                    Text(activePreset.arabicName)
-                        .font(.system(size: 30, weight: .light))
-                        .foregroundColor(gold.opacity(0.8))
+                    VStack(spacing: 6) {
+                        Text(currentPhaseArabic)
+                            .font(.system(size: 28, weight: .light))
+                            .foregroundColor(t.primaryText.opacity(0.85))
+
+                        Text(currentTransliteration)
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(t.tertiaryText)
+                    }
                 }
-                .padding(.bottom, 36)
+                .padding(.bottom, 32)
 
-                // Ring + Counter
+                // Progress ring
                 ZStack {
+                    // Track
                     Circle()
-                        .stroke(Color.white.opacity(0.08), lineWidth: 10)
-                        .frame(width: 260, height: 260)
+                        .stroke(t.ringTrack, lineWidth: ringStroke)
+                        .frame(width: ringSize, height: ringSize)
 
+                    // Glow layer (blurred)
                     Circle()
-                        .trim(from: 0, to: segmentFraction)
+                        .trim(from: 0, to: ringProgress)
                         .stroke(
-                            AngularGradient(
-                                colors: [gold.opacity(0.5), gold],
-                                center: .center
-                            ),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                            t.ringGradient,
+                            style: StrokeStyle(lineWidth: glowStroke, lineCap: .round)
                         )
-                        .frame(width: 260, height: 260)
+                        .frame(width: ringSize, height: ringSize)
+                        .rotationEffect(.degrees(-90))
+                        .blur(radius: 6)
+                        .opacity(0.5)
+                        .animation(.easeOut(duration: 0.15), value: counter.count)
+
+                    // Main arc
+                    Circle()
+                        .trim(from: 0, to: ringProgress)
+                        .stroke(
+                            t.ringGradient,
+                            style: StrokeStyle(lineWidth: ringStroke, lineCap: .round)
+                        )
+                        .frame(width: ringSize, height: ringSize)
                         .rotationEffect(.degrees(-90))
                         .animation(.easeOut(duration: 0.15), value: counter.count)
 
-                    VStack(spacing: 6) {
+                    // Indicator dot at arc end
+                    if ringProgress > 0 {
+                        Circle()
+                            .fill(t.ringGradient)
+                            .frame(width: 12, height: 12)
+                            .shadow(color: t.ringGlow, radius: 8)
+                            .offset(y: -ringSize / 2)
+                            // Dot must use the same start point + direction as the trimmed arc.
+                            .rotationEffect(.degrees(360 * Double(ringProgress)))
+                            .animation(.easeOut(duration: 0.15), value: counter.count)
+                    }
+
+                    // Count inside ring
+                    VStack(spacing: 2) {
                         Text("\(counter.count)")
-                            .font(.system(size: 90, weight: .thin, design: .rounded))
-                            .foregroundColor(.white)
+                            .font(.system(size: 84, weight: .semibold, design: .rounded))
+                            .foregroundColor(t.primaryText)
                             .contentTransition(.numericText())
                             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: counter.count)
                             .monospacedDigit()
+
+                        if activePreset.isQuickCounter {
+                            Button { showTargetPicker = true } label: {
+                                Text("of \(activePreset.targetCount)")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundColor(t.tertiaryText)
+                                    .underline(color: t.tertiaryText.opacity(0.5))
+                            }
+                        } else {
+                            Text("of \(activePreset.targetCount)")
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundColor(t.tertiaryText)
+                        }
                     }
                 }
 
-                // Milestone dots
-                if !milestones.isEmpty {
-                    HStack(spacing: 14) {
-                        ForEach(milestones, id: \.self) { milestone in
+                // Phase dots
+                if phaseCount > 1 {
+                    HStack(spacing: 10) {
+                        ForEach(0..<phaseCount, id: \.self) { i in
                             Circle()
-                                .fill(counter.count >= milestone ? gold : Color.white.opacity(0.15))
-                                .frame(width: 9, height: 9)
+                                .fill(i <= currentPhaseIndex ? t.dotActive : t.dotInactive)
+                                .frame(width: 6, height: 6)
                                 .animation(.easeOut(duration: 0.2), value: counter.count)
                         }
                     }
-                    .padding(.top, 28)
+                    .padding(.top, 24)
                 }
-
-                // Phase label
-                Text(currentPhaseText)
-                    .font(.system(size: 20, weight: .light))
-                    .foregroundColor(gold.opacity(0.75))
-                    .padding(.top, milestones.isEmpty ? 28 : 16)
-                    .animation(.easeInOut(duration: 0.3), value: currentPhaseText)
 
                 // Lap counter
                 if appState.lapsThisSession > 0 {
                     Text("Round \(appState.lapsThisSession)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(gold.opacity(0.5))
-                        .padding(.top, 8)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(t.secondaryText)
+                        .padding(.top, 10)
                         .transition(.opacity)
                 }
 
-                // Pocket hint
+                // Hint
                 Text("Press volume buttons to count")
                     .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.25))
-                    .padding(.top, 10)
+                    .foregroundColor(t.tertiaryText)
+                    .padding(.top, phaseCount > 1 ? 16 : 24)
 
                 Spacer()
-
-                // Reset button
-                Button(action: { counter.manualReset() }) {
-                    Label("Reset", systemImage: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.white.opacity(0.45))
-                        .padding(.horizontal, 30)
-                        .padding(.vertical, 12)
-                        .background(Color.white.opacity(0.07))
-                        .cornerRadius(22)
-                }
-                .padding(.bottom, 50)
             }
         }
         .onAppear {
@@ -178,11 +234,53 @@ struct ContentView: View {
                 counter.setupVolumeView(in: window)
             }
         }
+        .sheet(isPresented: $showStats) {
+            StatsView(appState: appState)
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView(appState: appState)
         }
+        .sheet(isPresented: $showBenefits) {
+            BenefitsView()
+        }
         .sheet(isPresented: $showPresets) {
             PresetsView(appState: appState)
+        }
+        .sheet(isPresented: $showDhikrPicker) {
+            DhikrPickerView(
+                currentArabicText: activePreset.arabicName,
+                onSelect: { phrase in
+                    appState.updateQuickCounter(
+                        arabicText: phrase.arabicText,
+                        transliteration: phrase.transliteration,
+                        targetCount: phrase.defaultCount
+                    )
+                    counter.count = 0
+                },
+                onCustom: { arabic, translit in
+                    let currentTarget = appState.activePreset.targetCount
+                    appState.updateQuickCounter(
+                        arabicText: arabic,
+                        transliteration: translit,
+                        targetCount: currentTarget
+                    )
+                    counter.count = 0
+                }
+            )
+        }
+        .sheet(isPresented: $showTargetPicker) {
+            TargetPickerView(
+                currentTarget: activePreset.targetCount,
+                onSelect: { newTarget in
+                    let preset = appState.activePreset
+                    appState.updateQuickCounter(
+                        arabicText: preset.arabicName,
+                        transliteration: preset.phases.first?.transliteration ?? "",
+                        targetCount: newTarget
+                    )
+                    counter.count = 0
+                }
+            )
         }
     }
 }

@@ -1,6 +1,20 @@
 import Foundation
 import WidgetKit
 
+enum AppearanceMode: String, CaseIterable, Codable {
+    case system
+    case light
+    case dark
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+}
+
 final class AppState: ObservableObject {
     static let shared = AppState()
     static let suiteName = "group.com.alliance.tasbeeh"
@@ -22,6 +36,10 @@ final class AppState: ObservableObject {
         didSet { save(Key.iCloudSyncEnabled, iCloudSyncEnabled) }
     }
 
+    @Published var appearanceMode: AppearanceMode {
+        didSet { save(Key.appearanceMode, appearanceMode.rawValue) }
+    }
+
     // MARK: - Active Preset
 
     @Published var activePresetID: UUID {
@@ -33,7 +51,7 @@ final class AppState: ObservableObject {
     }
 
     var activePreset: DhikrPreset {
-        presets.first { $0.id == activePresetID } ?? .standardTasbeeh
+        presets.first { $0.id == activePresetID } ?? .quickCounter
     }
 
     // MARK: - Counters
@@ -53,7 +71,24 @@ final class AppState: ObservableObject {
     }
 
     @Published var currentStreak: Int {
-        didSet { save(Key.currentStreak, currentStreak) }
+        didSet {
+            save(Key.currentStreak, currentStreak)
+            if currentStreak > bestStreak {
+                bestStreak = currentStreak
+            }
+        }
+    }
+
+    @Published var bestStreak: Int {
+        didSet { save(Key.bestStreak, bestStreak) }
+    }
+
+    @Published var bestDayCount: Int {
+        didSet { save(Key.bestDayCount, bestDayCount) }
+    }
+
+    @Published var bestDayDate: String {
+        didSet { save(Key.bestDayDate, bestDayDate) }
     }
 
     @Published var lapsThisSession: Int = 0
@@ -85,23 +120,33 @@ final class AppState: ObservableObject {
         self.hapticIntensity = HapticIntensity(rawValue: rawIntensity) ?? .medium
         self.soundEnabled = store.bool(forKey: Key.soundEnabled)
         self.iCloudSyncEnabled = store.object(forKey: Key.iCloudSyncEnabled) == nil ? true : store.bool(forKey: Key.iCloudSyncEnabled)
+        let rawAppearance = store.string(forKey: Key.appearanceMode) ?? AppearanceMode.system.rawValue
+        self.appearanceMode = AppearanceMode(rawValue: rawAppearance) ?? .system
 
         // Load preset
-        let presetIDString = store.string(forKey: Key.activePresetID) ?? DhikrPreset.standardTasbeeh.id.uuidString
-        self.activePresetID = UUID(uuidString: presetIDString) ?? DhikrPreset.standardTasbeeh.id
+        let presetIDString = store.string(forKey: Key.activePresetID) ?? DhikrPreset.quickCounterID.uuidString
+        self.activePresetID = UUID(uuidString: presetIDString) ?? DhikrPreset.quickCounterID
 
         // Load presets
         if let data = store.data(forKey: Key.presets),
            let decoded = try? JSONDecoder().decode([DhikrPreset].self, from: data) {
-            self.presets = decoded
+            // Migration: ensure quick counter exists
+            if !decoded.contains(where: { $0.id == DhikrPreset.quickCounterID }) {
+                self.presets = [DhikrPreset.quickCounter] + decoded
+            } else {
+                self.presets = decoded
+            }
         } else {
-            self.presets = DhikrPreset.allBuiltIn
+            self.presets = [DhikrPreset.quickCounter] + DhikrPreset.allBuiltIn
         }
 
         // Load counters
         self.lifetimeCount = store.integer(forKey: Key.lifetimeCount)
         self.todayCount = store.integer(forKey: Key.todayCount)
         self.currentStreak = store.integer(forKey: Key.currentStreak)
+        self.bestStreak = store.integer(forKey: Key.bestStreak)
+        self.bestDayCount = store.integer(forKey: Key.bestDayCount)
+        self.bestDayDate = store.string(forKey: Key.bestDayDate) ?? ""
         self.todayDate = store.string(forKey: Key.todayDate) ?? ""
         self.lastActiveDate = store.string(forKey: Key.lastActiveDate) ?? ""
 
@@ -140,7 +185,13 @@ final class AppState: ObservableObject {
         lifetimeCount += 1
         updateStreak()
         // Update today in history
-        history[Self.todayString()] = todayCount
+        let today = Self.todayString()
+        history[today] = todayCount
+        // Track best day
+        if todayCount > bestDayCount {
+            bestDayCount = todayCount
+            bestDayDate = today
+        }
     }
 
     func completeLap() {
@@ -173,11 +224,18 @@ final class AppState: ObservableObject {
     }
 
     func deletePreset(_ preset: DhikrPreset) {
-        guard !preset.isBuiltIn else { return }
+        guard !preset.isBuiltIn && !preset.isQuickCounter else { return }
         presets.removeAll { $0.id == preset.id }
         if activePresetID == preset.id {
-            activePresetID = DhikrPreset.standardTasbeeh.id
+            activePresetID = DhikrPreset.quickCounterID
         }
+    }
+
+    func updateQuickCounter(arabicText: String, transliteration: String, targetCount: Int) {
+        guard let index = presets.firstIndex(where: { $0.id == DhikrPreset.quickCounterID }) else { return }
+        presets[index].arabicName = arabicText
+        presets[index].phases = [DhikrPhase(arabicText: arabicText, transliteration: transliteration, count: targetCount)]
+        presets[index].targetCount = targetCount
     }
 
     func updatePreset(_ preset: DhikrPreset) {
@@ -213,6 +271,19 @@ final class AppState: ObservableObject {
         let remoteStreak = Int(ubiquitous.longLong(forKey: Key.currentStreak))
         if remoteStreak > currentStreak {
             currentStreak = remoteStreak
+        }
+
+        let remoteBestStreak = Int(ubiquitous.longLong(forKey: Key.bestStreak))
+        if remoteBestStreak > bestStreak {
+            bestStreak = remoteBestStreak
+        }
+
+        let remoteBestDay = Int(ubiquitous.longLong(forKey: Key.bestDayCount))
+        if remoteBestDay > bestDayCount {
+            bestDayCount = remoteBestDay
+            if let remoteBestDayDate = ubiquitous.string(forKey: Key.bestDayDate) {
+                bestDayDate = remoteBestDayDate
+            }
         }
 
         if let data = ubiquitous.data(forKey: Key.history),
@@ -252,6 +323,60 @@ final class AppState: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
+    // MARK: - Computed Stats
+
+    var daysActive: Int {
+        history.values.filter { $0 > 0 }.count
+    }
+
+    var dailyAverage: Int {
+        guard daysActive > 0 else { return 0 }
+        let total = history.values.reduce(0, +)
+        return total / daysActive
+    }
+
+    var thisWeekCount: Int {
+        let cal = Calendar.current
+        let today = Date()
+        guard let weekStart = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: today)) else { return 0 }
+        var total = 0
+        for i in 0..<7 {
+            guard let day = cal.date(byAdding: .day, value: i, to: weekStart) else { continue }
+            let key = Self.dateString(for: day)
+            total += history[key] ?? 0
+        }
+        return total
+    }
+
+    var thisMonthCount: Int {
+        let cal = Calendar.current
+        let components = cal.dateComponents([.year, .month], from: Date())
+        let prefix = String(format: "%04d-%02d", components.year!, components.month!)
+        return history.filter { $0.key.hasPrefix(prefix) }.values.reduce(0, +)
+    }
+
+    func last7DaysData() -> [(date: Date, count: Int)] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        return (0..<7).reversed().compactMap { offset in
+            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            let key = Self.dateString(for: day)
+            let count = key == Self.todayString() ? todayCount : (history[key] ?? 0)
+            return (date: day, count: count)
+        }
+    }
+
+    func last30DaysData() -> [(date: Date, count: Int)] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        return (0..<30).reversed().compactMap { offset in
+            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            let key = Self.dateString(for: day)
+            let count = key == Self.todayString() ? todayCount : (history[key] ?? 0)
+            return (date: day, count: count)
+        }
+    }
+
     // MARK: - Date Helpers
 
     private static let dateFormatter: DateFormatter = {
@@ -280,12 +405,16 @@ fileprivate enum Key {
     static let hapticIntensity = "hapticIntensity"
     static let soundEnabled = "soundEnabled"
     static let iCloudSyncEnabled = "iCloudSyncEnabled"
+    static let appearanceMode = "appearanceMode"
     static let activePresetID = "activePresetID"
     static let presets = "presets"
     static let lifetimeCount = "lifetimeCount"
     static let todayCount = "todayCount"
     static let todayDate = "todayDate"
     static let currentStreak = "currentStreak"
+    static let bestStreak = "bestStreak"
+    static let bestDayCount = "bestDayCount"
+    static let bestDayDate = "bestDayDate"
     static let lastActiveDate = "lastActiveDate"
     static let history = "history"
 }

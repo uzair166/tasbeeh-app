@@ -154,9 +154,7 @@ final class VolumeCounter: ObservableObject {
         if count >= preset.targetCount {
             HapticManager.shared.targetCompleteVibration(intensity: intensity)
             appState.completeLap()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.count = 0
-            }
+            count = 0
         } else if preset.isPhaseTransition(at: count) {
             HapticManager.shared.milestoneVibration(intensity: intensity)
         } else {
